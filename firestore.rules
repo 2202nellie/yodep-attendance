@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['hr', 'it'];
+    }
+
+    function isHR() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'hr';
+    }
+
+    // Users collection
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin();
+      allow update: if isAdmin() || request.auth.uid == uid;
+      allow delete: if false;
+    }
+
+    // Attendance collection
+    match /attendance/{recordId} {
+      allow read: if isSignedIn() &&
+        (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() &&
+        request.resource.data.uid == request.auth.uid;
+      allow update: if isSignedIn() &&
+        (resource.data.uid == request.auth.uid || isAdmin());
+      allow delete: if false;
+    }
+
+    // Leaves collection
+    match /leaves/{leaveId} {
+      allow read: if isSignedIn() &&
+        (resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() &&
+        request.resource.data.uid == request.auth.uid;
+      allow update: if isHR();
+      allow delete: if false;
+    }
+  }
+}
